@@ -103,7 +103,7 @@ function build_ffmpeg_arch() {
 	local cxx_compiler="$TOOLCHAIN/bin/${TARGET_PREFIX}${API_LEVEL}-clang++"
 	
 	# 交叉编译 libvpx（启用共享库，禁用静态库以规避安卓链接冲突）
-	CC="$cc_compiler" CXX="$cxx_compiler" AS="$cc_compiler" AR="$TOOLCHAIN/bin/llvm-ar" NM="$TOOLCHAIN/bin/llvm-nm" ../configure \
+	CC="$cc_compiler" CXX="$cxx_compiler" AS="$cc_compiler -c" AR="$TOOLCHAIN/bin/llvm-ar" NM="$TOOLCHAIN/bin/llvm-nm" ../configure \
 		--target="$vpx_target" --prefix="$PREFIX_DIR" \
 		--disable-examples --disable-docs --disable-unit-tests --disable-tools \
 		--enable-vp9-highbitdepth --disable-shared --enable-static --enable-pic
