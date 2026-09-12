@@ -106,7 +106,7 @@ function build_ffmpeg_arch() {
 	CC="$cc_compiler" CXX="$cxx_compiler" ../configure \
 		--target="$vpx_target" --prefix="$PREFIX_DIR" \
 		--disable-examples --disable-docs --disable-unit-tests --disable-tools \
-		--enable-vp9-highbitdepth --enable-shared --disable-static --enable-pic
+		--enable-vp9-highbitdepth --disable-shared --enable-static --enable-pic
 	make -j"$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)"
 	make install
 	popd >/dev/null
