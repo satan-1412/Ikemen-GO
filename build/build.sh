@@ -91,6 +91,7 @@ function build_ffmpeg_arch() {
 	if [[ ! -d "$vpx_src" ]]; then
 		git clone --depth=1 -b v1.15.2 https://github.com/webmproject/libvpx.git "$vpx_src"
 	fi
+	rm -rf "$vpx_src/build-android-$ABI"
 	mkdir -p "$vpx_src/build-android-$ABI"
 	pushd "$vpx_src/build-android-$ABI" >/dev/null
 	
@@ -100,8 +101,10 @@ function build_ffmpeg_arch() {
 	local cc_compiler="$TOOLCHAIN/bin/${TARGET_PREFIX}${API_LEVEL}-clang"
 	local cxx_compiler="$TOOLCHAIN/bin/${TARGET_PREFIX}${API_LEVEL}-clang++"
 	
-	# 交叉编译 libvpx（仅保留解码器，避免将编码器编译进库）
-	CC="$cc_compiler" CXX="$cxx_compiler" AS="$cc_compiler -c" AR="$TOOLCHAIN/bin/llvm-ar" NM="$TOOLCHAIN/bin/llvm-nm" ../configure \
+	# 交叉编译 libvpx（显式注入 LD 与 STRIP，规避缺失 GCC 链接器的错误）
+	CC="$cc_compiler" CXX="$cxx_compiler" \
+	AR="$TOOLCHAIN/bin/llvm-ar" LD="$cc_compiler" STRIP="$TOOLCHAIN/bin/llvm-strip" NM="$TOOLCHAIN/bin/llvm-nm" \
+	../configure \
 		--target="$vpx_target" --prefix="$PREFIX_DIR" \
 		--disable-examples --disable-docs --disable-unit-tests --disable-tools \
 		--disable-install-bins --disable-install-docs \
