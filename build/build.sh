@@ -101,17 +101,17 @@ function build_ffmpeg_arch() {
 	local cc_compiler="$TOOLCHAIN/bin/${TARGET_PREFIX}${API_LEVEL}-clang"
 	local cxx_compiler="$TOOLCHAIN/bin/${TARGET_PREFIX}${API_LEVEL}-clang++"
 	
-	# 交叉编译 libvpx（将 AS 与 LD 显式指向 NDK Clang，使用 Clang 集成汇编器编译 NEON 汇编）
+	# 交叉编译 libvpx（环境变量注入 AS/CC/LD，移除错误的 --as 选项，在 make 阶段锁定 AS 编译器）
 	CC="$cc_compiler" CXX="$cxx_compiler" AS="$cc_compiler" \
 	AR="$TOOLCHAIN/bin/llvm-ar" LD="$cc_compiler" STRIP="$TOOLCHAIN/bin/llvm-strip" NM="$TOOLCHAIN/bin/llvm-nm" \
 	../configure \
-		--target="$vpx_target" --prefix="$PREFIX_DIR" --as="$cc_compiler" \
+		--target="$vpx_target" --prefix="$PREFIX_DIR" \
 		--disable-examples --disable-docs --disable-unit-tests --disable-tools \
 		--disable-install-bins --disable-install-docs \
 		--disable-vp8-encoder --disable-vp9-encoder \
 		--enable-vp8-decoder --enable-vp9-decoder --disable-webm-io \
 		--enable-vp9-highbitdepth --disable-shared --enable-static --enable-pic
-	make -j"$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)"
+	make AS="$cc_compiler" -j"$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN || echo 4)"
 	make install
 	popd >/dev/null
 	# -----------------------------------------------
