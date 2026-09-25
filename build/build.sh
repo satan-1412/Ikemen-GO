@@ -101,11 +101,11 @@ function build_ffmpeg_arch() {
 	local cc_compiler="$TOOLCHAIN/bin/${TARGET_PREFIX}${API_LEVEL}-clang"
 	local cxx_compiler="$TOOLCHAIN/bin/${TARGET_PREFIX}${API_LEVEL}-clang++"
 	
-	# 交叉编译 libvpx（显式注入 LD 与 STRIP，规避缺失 GCC 链接器的错误）
-	CC="$cc_compiler" CXX="$cxx_compiler" \
+	# 交叉编译 libvpx（将 AS 与 LD 显式指向 NDK Clang，使用 Clang 集成汇编器编译 NEON 汇编）
+	CC="$cc_compiler" CXX="$cxx_compiler" AS="$cc_compiler" \
 	AR="$TOOLCHAIN/bin/llvm-ar" LD="$cc_compiler" STRIP="$TOOLCHAIN/bin/llvm-strip" NM="$TOOLCHAIN/bin/llvm-nm" \
 	../configure \
-		--target="$vpx_target" --prefix="$PREFIX_DIR" \
+		--target="$vpx_target" --prefix="$PREFIX_DIR" --as="$cc_compiler" \
 		--disable-examples --disable-docs --disable-unit-tests --disable-tools \
 		--disable-install-bins --disable-install-docs \
 		--disable-vp8-encoder --disable-vp9-encoder \
