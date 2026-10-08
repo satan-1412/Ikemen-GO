@@ -299,7 +299,7 @@ function patch_reisen_android() {
 function patch_vulkan_32bit() {
 	local stub="$REPO_ROOT/src/render_vk_arm.go"
 	
-	# 1. 扫描所有 Vulkan 相关源文件，给它们统一加上 //go:build !arm（完全排除 32 位 ARM）
+	# 1. 扫描所有 Vulkan 相关源文件，统一追加 //go:build !arm（完全排除 32 位 ARM）
 	for f in "$REPO_ROOT"/src/*_vk*.go "$REPO_ROOT"/src/*_vk.go "$REPO_ROOT"/src/font_vk.go; do
 		[[ ! -f "$f" ]] && continue
 		[[ "$f" == *"_arm.go" ]] && continue
@@ -309,23 +309,42 @@ function patch_vulkan_32bit() {
 		fi
 	done
 	
-	# 2. 为 32 位生成合法桩代码，使 Renderer_VK 平滑代理回通用 GLES 渲染器 (Renderer)
-	echo "==> Creating 32-bit fallback stub for Vulkan..."
-	cat > "$stub" << 'EOF'
+	# 2. 动态匹配 RecreateSurfaceAndSwapchain 的返回值签名（void 或 error）
+	local rvk_ret=" {}"
+	if grep -E "func \([^)]*Renderer_VK\) RecreateSurfaceAndSwapchain\(\)[[:space:]]+error" "$REPO_ROOT"/src/render_vk_swap.go 2>/dev/null; then
+		rvk_ret=" error { return nil }"
+	fi
+	
+	# 3. 为 32 位生成完备桩代码：闭合接口约束、补全字段/方法，解决 system_sdl 与 util_android 的符号依赖
+	echo "==> Creating complete 32-bit fallback stub for Vulkan..."
+	cat > "$stub" << EOF
 //go:build arm
 
 package main
 
 type Renderer_VK struct {
 	Renderer
+	surfaceLost bool
 }
 
+func (r *Renderer_VK) RecreateSurfaceAndSwapchain()${rvk_ret}
+
 func newRenderer_VK() *Renderer_VK {
-	return &Renderer_VK{Renderer: newRenderer()}
+	return &Renderer_VK{}
 }
 
 func NewRenderer_VK() *Renderer_VK {
-	return &Renderer_VK{Renderer: newRenderer()}
+	return &Renderer_VK{}
+}
+
+type FontRenderer_VK struct{}
+
+func newFontRenderer_VK() *FontRenderer_VK {
+	return &FontRenderer_VK{}
+}
+
+func NewFontRenderer_VK() *FontRenderer_VK {
+	return &FontRenderer_VK{}
 }
 EOF
 }
