@@ -337,7 +337,9 @@ func NewRenderer_VK() *Renderer_VK {
 	return &Renderer_VK{}
 }
 
-type FontRenderer_VK struct{}
+type FontRenderer_VK struct {
+	FontRenderer
+}
 
 func newFontRenderer_VK() *FontRenderer_VK {
 	return &FontRenderer_VK{}
