@@ -297,36 +297,37 @@ function patch_reisen_android() {
 }
 
 function patch_vulkan_32bit() {
-	local f="$REPO_ROOT/src/render_vk.go"
 	local stub="$REPO_ROOT/src/render_vk_arm.go"
 	
-	# 1. 给官方 render_vk.go 打上 !arm 标签，在 32 位下完全排除该文件
-	if [[ -f "$f" ]] && ! grep -q "//go:build !arm" "$f"; then
-		echo "==> Patching src/render_vk.go: Disabling Vulkan for 32-bit ARM..."
-		printf '%s\n\n' '//go:build !arm' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
-	fi
+	# 1. 扫描所有 Vulkan 相关源文件，给它们统一加上 //go:build !arm（完全排除 32 位 ARM）
+	for f in "$REPO_ROOT"/src/*_vk*.go "$REPO_ROOT"/src/*_vk.go "$REPO_ROOT"/src/font_vk.go; do
+		[[ ! -f "$f" ]] && continue
+		[[ "$f" == *"_arm.go" ]] && continue
+		if ! grep -q "//go:build !arm" "$f"; then
+			echo "==> Disabling Vulkan for 32-bit ARM in $(basename "$f")..."
+			printf '%s\n\n' '//go:build !arm' | cat - "$f" > "$f.tmp" && mv "$f.tmp" "$f"
+		fi
+	done
 	
-	# 2. 为 32 位生成桩代码，将 Renderer_VK 降级桥接至默认的 Renderer_GL (GLES)
-	if [[ ! -f "$stub" ]]; then
-		echo "==> Creating 32-bit fallback stub for Vulkan..."
-		cat > "$stub" << 'EOF'
+	# 2. 为 32 位生成合法桩代码，使 Renderer_VK 平滑代理回通用 GLES 渲染器 (Renderer)
+	echo "==> Creating 32-bit fallback stub for Vulkan..."
+	cat > "$stub" << 'EOF'
 //go:build arm
 
 package main
 
 type Renderer_VK struct {
-	Renderer_GL
+	Renderer
 }
 
 func newRenderer_VK() *Renderer_VK {
-	return &Renderer_VK{}
+	return &Renderer_VK{Renderer: newRenderer()}
 }
 
 func NewRenderer_VK() *Renderer_VK {
-	return &Renderer_VK{}
+	return &Renderer_VK{Renderer: newRenderer()}
 }
 EOF
-	fi
 }
 
 function build_engine_arch() {
