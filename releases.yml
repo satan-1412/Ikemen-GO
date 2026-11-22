@@ -1,0 +1,101 @@
+name: build-android-apk
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build Android APK
+    if: ${{ github.actor != 'dependabot[bot]' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      # 【修复构建失败】：锁定 JDK 17，解决 Gradle 8.1.1 不兼容 Runner 默认 Java 25 (major version 69) 的问题
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      # 【神级优化】：绑定 build/build.sh 的哈希值缓存 C/C++ 依赖
+      - name: Cache C/C++ Dependencies
+        uses: actions/cache@v4
+        with:
+          path: build/android-deps
+          key: ${{ runner.os }}-ikemen-deps-${{ hashFiles('build/build.sh') }}
+
+      # 【神级优化】：引入 Gradle 官方缓存，加速增量编译
+      - name: Setup Gradle Cache
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Install System Dependencies
+        env:
+          DEBIAN_FRONTEND: noninteractive
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build nasm yasm
+
+      - name: Set Environment Variables
+        shell: bash
+        run: |
+          echo "version=nightly" >> $GITHUB_ENV
+          echo "buildTime=$(date '+%Y.%m.%d')" >> $GITHUB_ENV
+          echo "FAST_BUILD_MODE=0" >> $GITHUB_ENV
+          echo "🔥 已锁定极限发布模式 (FAST_BUILD_MODE=0): 启用 LTO 全局优化、-O3 激进编译与体积深度裁剪"
+
+      - name: Generate LICENSES.txt
+        shell: bash
+        run: |
+          set -euo pipefail
+          FFMPEG_REV="${FFMPEG_REV:-release/7.1}"
+          SCREENPACK_LIC_MAIN="https://raw.githubusercontent.com/ikemen-engine/Ikemen-GO-Screenpack/main/LICENCE.txt"
+          SCREENPACK_LIC_MASTER="https://raw.githubusercontent.com/ikemen-engine/Ikemen-GO-Screenpack/master/LICENCE.txt"
+          FFMPEG_LGPL="https://raw.githubusercontent.com/FFmpeg/FFmpeg/${FFMPEG_REV}/COPYING.LGPLv2.1"
+          FFMPEG_LICENSE_MD="https://raw.githubusercontent.com/FFmpeg/FFmpeg/${FFMPEG_REV}/LICENSE.md"
+          FFMPEG_CREDITS="https://raw.githubusercontent.com/FFmpeg/FFmpeg/${FFMPEG_REV}/CREDITS"
+          LIBXMP_README="https://raw.githubusercontent.com/libxmp/libxmp/master/README"
+          SDL2_LICENSE="https://raw.githubusercontent.com/libsdl-org/SDL/main/LICENSE.txt"
+
+          {
+            echo "============================="
+            echo " Ikemen GO - LICENSES.txt"
+            echo "============================="
+            echo -e "\nSection 1: Ikemen GO (MIT)"
+            cat LICENCE.txt || true
+            echo -e "\nSection 2: Bundled Assets"
+            ( curl -fsSL "$SCREENPACK_LIC_MAIN" || curl -fsSL "$SCREENPACK_LIC_MASTER" )
+            echo -e "\nSection 3: FFmpeg (LGPL v2.1)"
+            curl -fsSL "$FFMPEG_LGPL"; echo; curl -fsSL "$FFMPEG_LICENSE_MD"; echo; curl -fsSL "$FFMPEG_CREDITS"
+            echo -e "\nSection 4: libxmp"
+            curl -fsSL "$LIBXMP_README"
+            echo -e "\nSection 5: SDL2"
+            curl -fsSL "$SDL2_LICENSE"
+          } > LICENSES.txt
+
+      - name: Build Android APK
+        shell: bash
+        env:
+          BUILD_ANDROID_APK: '1'
+          APP_VERSION: ${{ env.version }}
+          APP_BUILDTIME: ${{ env.buildTime }}
+        run: |
+          set -euo pipefail
+          echo "==> Starting pure local build on GitHub Runner..."
+          # 🚨 修正后的精确路径
+          chmod +x build/build.sh
+          ./build/build.sh
+
+      - name: Upload APK to Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Ikemen_GO-Android-APK
+          path: |
+            bin/ikemen-go.apk
+            LICENSES.txt
+          if-no-files-found: error
+          retention-days: 7
